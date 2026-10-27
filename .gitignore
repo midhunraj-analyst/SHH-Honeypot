@@ -1,0 +1,9 @@
+data/
+.env
+*.key
+*.pem
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/

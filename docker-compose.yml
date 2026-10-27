@@ -1,0 +1,35 @@
+services:
+  sentinel:
+    image: sentinel:${TAG:-local}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "22:2222"   # real sshd must be moved to another port first
+      - "80:8080"
+    environment:
+      SENSOR_ID: ${SENSOR_ID:-sensor-01}
+      ALERT_WEBHOOK: ${ALERT_WEBHOOK:-}
+      ALERT_FORMAT: ${ALERT_FORMAT:-slack}
+    volumes:
+      - sentinel-data:/data
+    # --- containment: assume the process WILL be attacked ---
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [honeynet]
+
+networks:
+  honeynet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24   # must match SUBNET in deploy/egress-lockdown.sh
+
+volumes:
+  sentinel-data:

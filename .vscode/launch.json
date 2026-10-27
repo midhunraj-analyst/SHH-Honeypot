@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run sensor (local, high ports)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "sentinel",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "DATA_DIR": "${workspaceFolder}/data",
+        "BIND": "127.0.0.1",
+        "SSH_PORT": "2222",
+        "HTTP_PORT": "8080"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-x", "-q"],
+      "justMyCode": false
+    }
+  ]
+}

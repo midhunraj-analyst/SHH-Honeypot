@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-honeypot"
+version = "0.1.0"
+description = "Low-interaction multi-protocol honeypot with tamper-evident logging"
+requires-python = ">=3.11"
+dependencies = ["asyncssh>=2.14,<3"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+sentinel = "sentinel.__main__:run"
+sentinel-report = "sentinel.report:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

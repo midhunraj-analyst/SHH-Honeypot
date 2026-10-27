@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]" pip-audit
+      - run: ruff check .
+      - run: pytest -q
+      - run: pip-audit
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t sentinel:ci .
+      - name: Container starts and passes its healthcheck
+        run: |
+          docker run -d --name s -e DATA_DIR=/data sentinel:ci
+          for i in $(seq 1 20); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' s)" = healthy ] && exit 0
+            sleep 3
+          done
+          docker logs s
+          exit 1

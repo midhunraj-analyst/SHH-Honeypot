@@ -1,0 +1,37 @@
+name: Daily integrity check and digest
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ssh-setup
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+      - name: "Verify hash chain (a broken chain fails the run and notifies you)"
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+          PORT: ${{ secrets.SSH_PORT }}
+          USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -p "$PORT" "$USER@$HOST" \
+            'cd ~/sentinel && docker compose exec -T sentinel sentinel-report --verify /data/events.jsonl'
+      - name: "Digest into the job summary (private repos only, output contains attacker data)"
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+          PORT: ${{ secrets.SSH_PORT }}
+          USER: ${{ secrets.SSH_USER }}
+        run: |
+          { echo '```'
+            ssh -p "$PORT" "$USER@$HOST" \
+              'cd ~/sentinel && docker compose exec -T sentinel sentinel-report /data/events.jsonl'
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"

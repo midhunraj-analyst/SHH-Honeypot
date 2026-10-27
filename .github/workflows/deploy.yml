@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production   # add required reviewers in repo settings for a manual gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ssh-setup
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Build image
+        run: docker build -t "sentinel:${GITHUB_SHA}" .
+
+      - name: Ship image and config (no registry needed)
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+          PORT: ${{ secrets.SSH_PORT }}
+          USER: ${{ secrets.SSH_USER }}
+          SENSOR_ID: ${{ secrets.SENSOR_ID }}
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK }}
+        run: |
+          SSH="ssh -p $PORT $USER@$HOST"
+          $SSH 'mkdir -p ~/sentinel'
+          docker save "sentinel:${GITHUB_SHA}" | gzip | $SSH 'gunzip | docker load'
+          rsync -az -e "ssh -p $PORT" docker-compose.yml deploy "$USER@$HOST:~/sentinel/"
+          # secrets travel over stdin, never on a command line
+          printf 'TAG=%s\nSENSOR_ID=%s\nALERT_WEBHOOK=%s\n' \
+            "$GITHUB_SHA" "$SENSOR_ID" "$ALERT_WEBHOOK" \
+            | $SSH 'umask 077; cat > ~/sentinel/.env'
+
+      - name: Restart, lock down egress, verify
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+          PORT: ${{ secrets.SSH_PORT }}
+          USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -p "$PORT" "$USER@$HOST" '
+            set -e
+            cd ~/sentinel
+            docker compose up -d --remove-orphans
+            sudo -n ~/sentinel/deploy/egress-lockdown.sh
+            sleep 8
+            docker compose ps --status running --quiet | grep -q . || { docker compose logs --tail 50; exit 1; }
+            docker image prune -f --filter "until=168h" >/dev/null
+          '
